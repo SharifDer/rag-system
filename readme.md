@@ -100,7 +100,7 @@ python main.py  # Or use uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ### 6. Start the Telegram Bot (optional)
 
 ```bash
-python telegram_bot.py
+python app/bot.py
 ```
 
 ---
