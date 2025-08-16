@@ -1,0 +1,51 @@
+name: Deploy RAG System via SSH
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Build Docker image
+      run: docker build -t local-rag:latest .
+
+    - name: Save Docker image
+      run: docker save local-rag:latest | gzip > local-rag.tar.gz
+
+    - name: Copy Docker image to server
+      uses: appleboy/scp-action@v0.1.6
+      with:
+        host: direct.labs.play-with-docker.com
+        username: ip172-18-0-18-d2g7qoi91nsg008ttcd0
+        key: ${{ secrets.SSH_KEY }}
+        port: 22
+        source: "local-rag.tar.gz"
+        target: "~/"
+
+    - name: Deploy container on server
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: direct.labs.play-with-docker.com
+        username: ip172-18-0-18-d2g7qoi91nsg008ttcd0
+        key: ${{ secrets.SSH_KEY }}
+        port: 22
+        script: |
+          # Load the Docker image
+          gunzip -c ~/local-rag.tar.gz | docker load
+
+          # Stop and remove old container
+          if [ $(docker ps -q -f name=local-rag) ]; then
+            docker stop local-rag
+            docker rm local-rag
+          fi
+
+          # Run the new container
+          docker run -d --name local-rag -p 8000:8000 local-rag:latest
