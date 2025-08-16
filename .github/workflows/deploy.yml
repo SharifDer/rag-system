@@ -1,9 +1,6 @@
-name: Deploy RAG System via SSH
+name: RAG System Quick Deploy (PWD)
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -14,23 +11,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Build Docker image
-      run: docker build -t local-rag:latest .
-
-    - name: Save Docker image
-      run: docker save local-rag:latest | gzip > local-rag.tar.gz
-
-    - name: Copy Docker image to server
-      uses: appleboy/scp-action@v0.1.6
-      with:
-        host: direct.labs.play-with-docker.com
-        username: ip172-18-0-18-d2g7qoi91nsg008ttcd0
-        key: ${{ secrets.SSH_KEY }}
-        port: 22
-        source: "local-rag.tar.gz"
-        target: "~/"
-
-    - name: Deploy container on server
+    - name: Deploy to PWD via SSH
       uses: appleboy/ssh-action@v0.1.7
       with:
         host: direct.labs.play-with-docker.com
@@ -38,14 +19,25 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: 22
         script: |
-          # Load the Docker image
-          gunzip -c ~/local-rag.tar.gz | docker load
-
-          # Stop and remove old container
+          echo "Updating code on PWD..."
+          cd ~/ || mkdir -p ~/ && cd ~/
+          
+          # Remove old code if exists
+          rm -rf rag-system
+          
+          # Clone repo fresh
+          git clone https://github.com/SharifDer/rag-system.git
+          cd rag-system
+          
+          # Build Docker image
+          docker build -t local-rag:latest .
+          
+          # Stop old container if running
           if [ $(docker ps -q -f name=local-rag) ]; then
             docker stop local-rag
             docker rm local-rag
           fi
-
-          # Run the new container
+          
+          # Run new container
           docker run -d --name local-rag -p 8000:8000 local-rag:latest
+          echo "Deployment finished! FastAPI should be running on port 8000."
